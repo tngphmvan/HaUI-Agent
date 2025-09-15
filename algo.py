@@ -165,8 +165,8 @@ if __name__ == "__main__":
 
     learned_courses.append(TcCNTT1[0])
     learned_courses.append(TcCNTT2[0])
-    learned_courses.extend(TcGDTC[0:5])
-    learned_courses.append(TcNN4[0])
+    learned_courses.extend(TcGDTC[0:2])
+    learned_courses.extend(sorted(TcNN4, key=lambda c: c.name)[0:2])
 
     for course in learned_courses:
         print(f"Kỳ: {course.semester}, {course.name}, {course.credit}")
