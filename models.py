@@ -1,49 +1,46 @@
-class Course:
-    def __init__(self, name, credit, optional_group, prerequisite: list[str] = [], before: list[str] = [], id: str = "", semester: int = None, ):
-        self.name = name
-        self.id = id
-        self.credit = credit
-        self.prerequisite = prerequisite
-        self.before = before
-        self.semester = semester
-        self.optional_group = optional_group
+from pydantic import BaseModel, Field
+from typing import List, Optional
 
-    def __str__(self):
-        return f"Course: {self.name}, ID: {self.id}, Credit: {self.credit}, Semester: {self.semester}, Optional Group: {self.optional_group}, Prerequisite: {self.prerequisite}, Before: {self.before}"
 
-    def __eq__(self, value):
-        # print("Checking equality between", self, "and", value)
-        if isinstance(value, Course):
-            return self.id == value.id
-        elif isinstance(value, str):
-            return self.id == value
-        return False
+class Course(BaseModel):
+    name: str
+    id: str
+    credit: int
+    prerequisite: List = Field(default_factory=list)
+    before: List = Field(default_factory=list)
+    semester: Optional[int] = None
+    optional_group: Optional[str] = ""
 
     def __hash__(self):
         return hash(self.id)
 
-
-class Semester:
-    def __init__(self, name):
-        self.name = name
-        self.courses = []
-        self.total_credit = 0
+    def __eq__(self, other):
+        if isinstance(other, Course):
+            return self.id == other.id
+        return False
 
     def __str__(self):
-        return f"Semester: {self.name}, Total Credits: {self.total_credit}"
+        return f"{self.name} (ID: {self.id}, Credit: {self.credit}, Prerequisite: {', '.join(self.prerequisite) if self.prerequisite else 'None'})"
 
 
-class Student:
-    def __init__(self, name, student_id, program, learned: list[Course] = [], semester: int = 2):
-        self.name = name
-        self.student_id = student_id
-        self.program = program
-        self.learned = learned
-        self.semester = semester
+class Semester(BaseModel):
+    name: str
+    courses: List[Course] = Field(default_factory=list)
+    total_credit: int = 0
 
 
-class State:
-    def __init__(self, student: Student, semester: Semester):
-        self.student = student
-        self.semester = semester
-        self.total_credit = semester.total_credit
+class Student(BaseModel):
+    name: str
+    student_id: str
+    program: str
+    learned: List[Course] = Field(default_factory=list)
+    semester: int = 2
+
+    def __str__(self):
+        return f"{self.name} (ID: {self.student_id}, Program: {self.program}, Semester: {self.semester}, Learned Courses: {len(self.learned)})"
+
+
+class State(BaseModel):
+    student: Student
+    semester: Semester
+    total_credit: int

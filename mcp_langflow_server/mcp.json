@@ -1,0 +1,11 @@
+{
+    "name": "langflow-mcp-server",
+    "version": "1.0.0",
+    "capabilities": {
+        "tools": {
+            "listChanged": true
+        },
+        "resources": {},
+        "prompts": {}
+    }
+}

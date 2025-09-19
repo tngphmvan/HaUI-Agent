@@ -1,0 +1,33 @@
+{
+    "Kỳ 1":{
+        "học phần bắt buộc":[
+            {
+                "Mã môn": "",
+                "Tên môn": "",
+                "Số tín chỉ": 0,
+                "Môn tiên quyết": [],
+                "Môn học trước": []    
+            }
+        ],
+        "học phần tự chọn":[
+            {
+                "TcCNTT1": {
+                    "Số tín chỉ đang có": 21,
+                    "Số tín chỉ tối thiểu": 6,
+                    "Danh sách môn": [
+                        {
+                        "Mã môn": "",
+                        "Tên môn": "",
+                        "Số tín chỉ": 0,
+                        "Môn tiên quyết": [],
+                        "Môn học trước": []
+                        }
+                    ]
+                }
+            },
+            {
+                "TcCNTT1": []
+            }
+        ]
+    }
+}
