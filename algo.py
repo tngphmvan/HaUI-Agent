@@ -60,6 +60,11 @@ def greedy_adding_algorithm(state: State, proposed_courses: list[Course], availa
     tong = 0
     for course in sorted(available_courses, key=lambda c: c.semester):
         can_add, message = course_checking(state, course, max_credits)
+        # Chỉ thêm 1 môn với mỗi nhóm tự chọn trong một học kỳ
+        if course.optional_group:
+            if any(c.optional_group == course.optional_group for c in state.semester.courses):
+                can_add = False
+                message = f"Đã có khóa học từ nhóm tự chọn {course.optional_group} trong học kỳ này."
         if can_add:
             add_course(state, course)
             tong += course.credit
@@ -128,15 +133,33 @@ if __name__ == "__main__":
                         #     f"Added course: {course.name} to semester {course.semester} in optional group {course.optional_group}")
                         semesters[course.semester - 1].courses.append(course)
 
-        semesters[int(ky_hoc.split('_')[1]) - 1].total_credit = sum(
-            course.credit for course in semesters[int(ky_hoc.split('_')[1]) - 1].courses)
+        # Tính tổng tín chỉ: các môn bắt buộc cộng hết, mỗi nhóm tự chọn chỉ lấy 1 môn (tín chỉ cao nhất)
+        semester_courses = semesters[int(ky_hoc.split('_')[1]) - 1].courses
+        total_credit = 0
+        # Nhóm các môn tự chọn theo optional_group
+        optional_group_seen = set()
+        for course in semester_courses:
+            if course.optional_group:
+                if course.optional_group not in optional_group_seen:
+                    # Lấy tất cả môn cùng nhóm trong kỳ này
+                    same_group_courses = [
+                        c for c in semester_courses if c.optional_group == course.optional_group]
+                    # Lấy môn có tín chỉ cao nhất
+                    max_course = max(same_group_courses,
+                                     key=lambda c: c.credit)
+                    total_credit += max_course.credit
+                    optional_group_seen.add(course.optional_group)
+            else:
+                total_credit += course.credit
+        semesters[int(ky_hoc.split('_')[1]) - 1].total_credit = total_credit
 
     optional_groups = list(set(
         course for semester in semesters for course in semester.courses if course.optional_group))
 
     print("Optional groups found:", len(optional_groups))
     student = Student(name="Nguyen Van A", student_id="123456", program="CNTT")
-    initial_state = State(student=student, semester=semesters[1])
+    initial_state = State(
+        student=student, semester=Semester("Học kỳ hiện tại"))
 
     proposed_courses = random.sample(semesters[7].courses, k=min(0, 3))
 
@@ -165,11 +188,31 @@ if __name__ == "__main__":
 
     learned_courses.append(TcCNTT1[0])
     learned_courses.append(TcCNTT2[0])
-    learned_courses.extend(TcGDTC[0:2])
-    learned_courses.extend(sorted(TcNN4, key=lambda c: c.name)[0:2])
+    learned_courses.extend(sorted(TcGDTC, key=lambda c: c.semester)[0:2])
+    learned_courses.extend(sorted(TcNN4, key=lambda c: c.semester)[0:2])
 
-    for course in learned_courses:
-        print(f"Kỳ: {course.semester}, {course.name}, {course.credit}")
+    # for course in learned_courses:
+    #     print(f"Kỳ: {course.semester}, {course.name}, {course.credit}")
 
     student.learned = learned_courses
     print(f"Student {student.name} đã học {len(student.learned)} khóa học.")
+
+    available_courses = [
+        course for semester in semesters[2:9] for course in semester.courses
+    ]
+    print(f"Có {len(available_courses)} khóa học có sẵn để thêm.")
+    # for course in available_courses:
+    #     print(
+    #         f"Kỳ: {course.semester}, {course.name}, {course.credit}, {course.optional_group}")
+
+    designed_credits = [semester.total_credit for semester in semesters]
+    print(designed_credits)
+    # final_state = greedy_adding_algorithm(
+    #     initial_state, proposed_courses, available_courses, max_credits=33)
+    # for course in final_state.semester.courses:
+    #     print(
+    #         f"Kỳ: {course.semester}, {course.name}, {course.credit}, {course.optional_group}")
+
+    for course in semesters[0].courses:
+        print(
+            f"Kỳ: {course.semester}, {course.name}, {course.credit}, {course.optional_group}")
