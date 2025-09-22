@@ -6,9 +6,9 @@ class Course(BaseModel):
     name: str
     id: str
     credit: int
-    prerequisite: List = Field(
+    prerequisite: List[dict] = Field(
         default_factory=list, description="Các khóa học tiên quyết, cần hoàn thành trước khi học khóa này")
-    before: List = Field(
+    before: List[dict] = Field(
         default_factory=list, description="Các khóa học cần hoàn thành trước khi học khóa này")
     semester: Optional[int] = Field(description="Học kỳ của khóa học")
     optional_group: Optional[str] = Field(
@@ -23,7 +23,7 @@ class Course(BaseModel):
         return False
 
     def __str__(self):
-        return f"{self.name} (ID: {self.id}, Credit: {self.credit}, Prerequisite: {', '.join(self.prerequisite) if self.prerequisite else 'None'})"
+        return f"{self.name} (ID: {self.id}, Credit: {self.credit}, Prerequisite: {', '.join(self.prerequisite) if self.prerequisite else 'None'}, Before: {self.before})"
 
 
 class Semester(BaseModel):
@@ -54,8 +54,8 @@ class State(BaseModel):
 
 
 class CoursePlanRequest(BaseModel):
-    # proposed_courses: List[Course] = Field(
-    #     default_factory=list, description="Danh sách các khóa học đề xuất để lên kế hoạch")
+    proposed_courses: List[str] = Field(
+        default_factory=list, description="Danh sách mã các khóa học đề xuất để lên kế hoạch")
     max_credits: int = Field(
         25, description="Tổng tín chỉ mà sinh viên muốn đăng ký", ge=11, le=27)
     # student_info: Optional[Student] = Field(

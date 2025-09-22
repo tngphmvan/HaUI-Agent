@@ -1,10 +1,14 @@
-from models import Student, Course, Semester, State
+from models import CoursePlanResponse, Student, Course, Semester, State, CoursePlanRequest
 from typing import Tuple, List
 import json
 import random
 import sys
 import io
+import logging
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+
+logging.basicConfig(level=logging.DEBUG)
+logger = logging.getLogger(__name__)
 
 
 def course_checking(state: State, course: Course, max_credits: int) -> Tuple[bool, str]:
@@ -53,41 +57,124 @@ def add_course(state: State, course: Course):
     state.semester.total_credit += course.credit
 
 
-def greedy_adding_algorithm(state: State, proposed_courses: list[Course], available_courses: list[Course], max_credits: int) -> Tuple[List[Course], int]:
-    """Algorithm to greedily add courses based on certain conditions.
+# def greedy_adding_algorithm(state: State, proposed_courses: list[Course], available_courses: list[Course], max_credits: int) -> Tuple[List[Course], int]:
+#     """Algorithm to greedily add courses based on certain conditions.
 
-    Args:
-        state (State): Current state of the student
-        proposed_courses (list[Course]): Proposed courses to consider first
-        available_courses (list[Course]): Available courses to choose from
-        max_credits (int): Maximum credits allowed
+#     Args:
+#         state (State): Current state of the student
+#         proposed_courses (list[Course]): Proposed courses to consider first
+#         available_courses (list[Course]): Available courses to choose from
+#         max_credits (int): Maximum credits allowed
 
-    Returns:
-        Tuple[List[Course], int]: List of added courses and total credits
-    """
+#     Returns:
+#         Tuple[List[Course], int]: List of added courses and total credits
+#     """
 
-    # Set semester of proposed courses to 0 if different from student's current semester
+#     # Set semester of proposed courses to 0 if different from student's current semester
+#     for course in proposed_courses:
+#         if course.semester != state.student.semester:
+#             course.semester = 0
+#     for course in proposed_courses:
+#         add_course(state, course)
+#     # Sort available courses by semester to prioritize adding courses from lower semesters first
+#     tong = 0
+#     for course in sorted(available_courses, key=lambda c: c.semester):
+#         if course.name.find("Tiếng Trung") != -1 or course.name.find("Tiếng Hàn") != -1 or course.name.find("Tiếng Nhật") != -1:
+#             continue
+#         if course in state.student.learned:
+#             print(f"Skipping {course.name} as it is already learned.")
+#             continue
+#             # Just one course from each optional group in a semester
+#         if course.optional_group:
+#             if any(c.optional_group == course.optional_group for c in state.semester.courses):
+#                 print(
+#                     f"Skipping {course.name} as it conflicts with another course in the same optional group.")
+#                 continue
+
+#         tong += course.credit
+#         add_course(state, course)
+#         logger.debug(
+#             f"Added course: {course.id} with {course.credit} credits.")
+#         logger.debug(f"Total credits now: {tong}.")
+#         if tong >= max_credits:
+#             break
+#     return (state.semester.courses, state.semester.total_credit)
+
+# def greedy_adding_algorithm(state: State, proposed_courses: list[Course], available_courses: list[Course], max_credits: int) -> Tuple[List[Course], int]:
+#     # Reset trước khi bắt đầu
+#     state.semester.courses = []
+#     state.semester.total_credit = 0
+#     state.total_credit = 0
+
+#     # Add proposed courses trước
+#     for course in proposed_courses:
+#         logger.debug(f"Adding proposed course: {course.id}")
+#         add_course(state, course)
+
+#     for course in sorted(available_courses, key=lambda c: c.semester):
+#         if course.name.find("Tiếng Trung") != -1 or course.name.find("Tiếng Hàn") != -1 or course.name.find("Tiếng Nhật") != -1:
+#             continue
+#         if course in state.student.learned:
+#             continue
+#         if course.optional_group and any(c.optional_group == course.optional_group for c in state.semester.courses):
+#             continue
+
+#         if state.semester.total_credit + course.credit > max_credits:
+#             break
+
+#         add_course(state, course)
+#         logger.debug(
+#             f"Added course: {course.id} with {course.credit} credits.")
+#         logger.debug(f"Total credits now: {state.semester.total_credit}.")
+
+#     return (state.semester.courses, state.semester.total_credit)
+
+
+def greedy_adding_algorithm(
+    state: State,
+    proposed_courses: list[Course],
+    available_courses: list[Course],
+    max_credits: int
+) -> Tuple[List[Course], int]:
+    # Reset trước khi bắt đầu
+    state.semester.courses = []
+    state.semester.total_credit = 0
+    state.total_credit = 0
+
+    # B1: Add các môn đề xuất (proposed) trước
     for course in proposed_courses:
-        if course.semester != state.student.semester:
-            course.semester = 0
+        if course not in state.student.learned and course not in state.semester.courses:
+            if state.semester.total_credit + course.credit <= max_credits:
+                add_course(state, course)
+            #     logger.debug(
+            #         f"Added proposed course: {course.id} ({course.credit} credits).")
+            # else:
+                # logger.debug(
+                #     f"Skip proposed course {course.id}, would exceed max credits.")
 
-    # Sort available courses by semester to prioritize adding courses from lower semesters first
-    tong = 0
+    # B2: Sau đó add các môn khả dụng (available)
     for course in sorted(available_courses, key=lambda c: c.semester):
-        can_add, message = course_checking(state, course, max_credits)
-        # Just one course from each optional group in a semester
-        if course.optional_group:
-            if any(c.optional_group == course.optional_group for c in state.semester.courses):
-                can_add = False
-                message = f"Đã có khóa học từ nhóm tự chọn {course.optional_group} trong học kỳ này."
-        if can_add:
-            add_course(state, course)
-            tong += course.credit
-            print(
-                f"Currently add: {course.name} with {course.credit} credits. {message}")
-        if tong >= max_credits:
+        if "Tiếng Trung" in course.name or "Tiếng Hàn" in course.name or "Tiếng Nhật" in course.name:
+            continue
+        if course in state.student.learned or course in state.semester.courses:
+            continue
+        if course.optional_group and any(c.optional_group == course.optional_group for c in state.semester.courses):
+            continue
+        if state.semester.total_credit + course.credit > max_credits:
             break
-    return (state.semester.courses, state.total_credit)
+
+        add_course(state, course)
+        # logger.debug(
+        #     f"Added available course: {course.id} ({course.credit} credits).")
+
+    return (state.semester.courses, state.semester.total_credit)
+
+
+def course_mapping(course_id: str, courses_list: list[Course]) -> Course:
+    for course in courses_list:
+        if course.id == course_id:
+            return course
+    return None
 
 
 # if __name__ == "__main__":
@@ -104,49 +191,58 @@ semesters = [
 program_framework = json.load(
     open("khung_ctrinh_cntt_14_9_processed.json", 'r', encoding='utf-8'))
 # print(program_framework)
-for ky_hoc in program_framework.keys():
-    for course_tup in program_framework[ky_hoc]:
-        if isinstance(course_tup, (list, tuple)) and len(course_tup) == 5:
-            course_id, course_name, credit, prerequisite, before = course_tup
-            course = Course(
-                name=course_name,
-                credit=int(float(credit)),
-                prerequisite=prerequisite,
-                before=before,
-                id=course_id,
-                # Giả sử tên kỳ học có định dạng 'ky_X'
-                semester=int(ky_hoc.split('_')[1]),
-                optional_group=""  # Hoặc gán giá trị phù hợp nếu có
-            )
 
-            semesters[course.semester-1].courses.append(course)
+for ky_hoc in program_framework.keys():
+    for nhom_tu_chon in program_framework[ky_hoc]['hoc_phan_tu_chon']:
+        if "TcNN1" in nhom_tu_chon.keys():
+            del nhom_tu_chon['TcNN1']
+        if "TcNN2" in nhom_tu_chon.keys():
+            del nhom_tu_chon['TcNN2']
+        if "TcNN3" in nhom_tu_chon.keys():
+            del nhom_tu_chon['TcNN3']
+        if "Tc Ôn tập NN" in nhom_tu_chon.keys():
+            del nhom_tu_chon['Tc Ôn tập NN']
+        if "TcGDTC" in nhom_tu_chon.keys():
+            del nhom_tu_chon['TcGDTC']
+        if nhom_tu_chon == {}:
+            program_framework[ky_hoc]['hoc_phan_tu_chon'].remove(nhom_tu_chon)
+
+for ky_hoc in program_framework.keys():
+    for course in program_framework[ky_hoc]['hoc_phan_bat_buoc']:
+        course = Course(
+            name=course['ten_hp'],
+            credit=int(float(course['so_tc'])),
+            prerequisite=course['prerequisite'],
+            before=course['before'],
+            id=course['ma_hp'],
+            semester=int(course['hoc_ky']),
+            optional_group=""
+        )
+        semesters[course.semester-1].courses.append(course)
+        # print(
+        #     f"Added course: {course.name} to semester {course.semester}")
+        # print("course", course.name)
+    for course_optional in program_framework[ky_hoc]['hoc_phan_tu_chon']:
+        # Handle dict items (e.g., TcCNTT5) if needed, or skip
+        # print("course_tup", course_tup)
+        optional_group = list(course_optional.keys())[0]
+        for sub_course in course_optional[optional_group]:
+            course = Course(
+                name=sub_course['ten_hp'],
+                credit=int(float(sub_course['so_tc'])),
+                prerequisite=sub_course['prerequisite'],
+                before=sub_course['before'],
+                id=sub_course['ma_hp'],
+                # Giả sử tên kỳ học có định dạng 'ky_X'
+                semester=int(sub_course['hoc_ky']),
+                # Hoặc gán giá trị phù hợp nếu có
+                optional_group=optional_group
+            )
+            # print(int(ky_hoc.split('_')[1]))
+            # print("holaa", course.optional_group)
             # print(
-            #     f"Added course: {course.name} to semester {course.semester}")
-            # print("course", course.name)
-        elif isinstance(course_tup, dict):
-            # Handle dict items (e.g., TcCNTT5) if needed, or skip
-            # print("course_tup", course_tup)
-            optional_group = list(course_tup.keys())[0]
-            # print("optional_group", optional_group[0])
-            for sub_course_tup in course_tup.values():
-                for course in sub_course_tup:
-                    course_id, course_name, credit, prerequisite, before = course
-                    course = Course(
-                        name=course_name,
-                        credit=int(float(credit)),
-                        prerequisite=prerequisite,
-                        before=before,
-                        id=course_id,
-                        # Giả sử tên kỳ học có định dạng 'ky_X'
-                        semester=int(ky_hoc.split('_')[1]),
-                        # Hoặc gán giá trị phù hợp nếu có
-                        optional_group=optional_group
-                    )
-                    # print(int(ky_hoc.split('_')[1]))
-                    # print("holaa", course.optional_group)
-                    # print(
-                    #     f"Added course: {course.name} to semester {course.semester} in optional group {course.optional_group}")
-                    semesters[course.semester - 1].courses.append(course)
+            #     f"Added course: {course.name} to semester {course.semester} in optional group {course.optional_group}")
+            semesters[course.semester - 1].courses.append(course)
 
     # Tính tổng tín chỉ: các môn bắt buộc cộng hết, mỗi nhóm tự chọn chỉ lấy 1 môn (tín chỉ cao nhất)
     semester_courses = semesters[int(ky_hoc.split('_')[1]) - 1].courses
@@ -171,11 +267,15 @@ for ky_hoc in program_framework.keys():
 optional_groups = list(set(
     course for semester in semesters for course in semester.courses if course.optional_group))
 
-print("Optional groups found:", len(optional_groups))
-student = Student(name="Nguyen Van A", student_id="123456",
-                  program="CNTT", semester=3, learned=[])
-initial_state = State(
-    student=student, semester=Semester(name=3, courses=[], total_credit=0), total_credit=0)
+total_course = [
+    course for semester in semesters for course in semester.courses]
+logger.debug(f"Total courses in the program: {len(total_course)}")
+
+# for course in total_course:
+#     print(
+#         f"Kỳ: {course.semester}, {course.name}, {course.credit}, {course.optional_group}")
+# print(f"Total courses in the program: {len(total_course)}")
+
 
 proposed_courses = random.sample(semesters[7].courses, k=min(0, 3))
 
@@ -183,14 +283,11 @@ learned_courses = [
     course for course in semesters[0].courses + semesters[1].courses if not course.optional_group
 ]
 
-TcGDTC = [
-    course for course in optional_groups if course.optional_group == "TcGDTC"]
+
 TcCNTT1 = [
     course for course in optional_groups if course.optional_group == "TcCNTT1"]
 TcCNTT2 = [
     course for course in optional_groups if course.optional_group == "TcCNTT2"]
-TcNN = [
-    course for course in optional_groups if course.optional_group == "Tc Ôn tập NN"]
 TcCNTT3 = [
     course for course in optional_groups if course.optional_group == "TcCNTT3"]
 TcCNTT4 = [
@@ -204,31 +301,89 @@ TcNN4 = [
 
 learned_courses.append(TcCNTT1[0])
 learned_courses.append(TcCNTT2[0])
-learned_courses.extend(sorted(TcGDTC, key=lambda c: c.semester)[0:2])
 learned_courses.extend(sorted(TcNN4, key=lambda c: c.semester)[0:2])
 
 # for course in learned_courses:
 #     print(f"Kỳ: {course.semester}, {course.name}, {course.credit}")
 
-student.learned = learned_courses
+student = Student(name="Nguyen Van A", student_id="123456",
+                  program="CNTT", semester=3, learned=learned_courses)
+initial_state = State(
+    student=student, semester=Semester(name=3, courses=[], total_credit=0), total_credit=0)
 print(f"Student {student.name} has learned {len(student.learned)} courses.")
-
 available_courses = [
-    course for semester in semesters[2:9] for course in semester.courses
-]
+    course for course in total_course if course not in student.learned and course.before == [] and course.prerequisite == []]
+
+print(f"Có {len(available_courses)} khóa học có sẵn để thêm.")
 print(f"There are {len(available_courses)} courses available to add.")
 # for course in available_courses:
 #     print(
 #         f"Kỳ: {course.semester}, {course.name}, {course.credit}, {course.optional_group}")
 
 designed_credits = [semester.total_credit for semester in semesters]
-print(designed_credits)
-courses, total_credits = greedy_adding_algorithm(
-    initial_state, proposed_courses, available_courses, max_credits=33)
-for course in courses:
-    print(
-        f"Semester: {course.semester}, {course.name}, {course.credit}, {course.optional_group}")
+# print(designed_credits)
+# courses, total_credits = greedy_adding_algorithm(
+#     initial_state, proposed_courses, available_courses, max_credits=15)
+# for course in courses:
+#     print(
+#         f"Semester: {course.semester}, {course.name}, {course.credit}, {course.optional_group}")
 
+# for course in available_courses:
+#     print(
+#         f"Kỳ: {course.semester}, {course.name}, {course.credit}, {course.optional_group}")
 # for course in semesters[0].courses:
 #     print(
 #         f"Kỳ: {course.semester}, {course.name}, {course.credit}, {course.optional_group}")
+
+
+def check_course_validity(course_ids: List[str]) -> str:
+    """Check if the proposed courses are valid for the student."""
+    proposed_courses = [course_mapping(course_id, total_course)
+                        for course_id in course_ids]
+    for course in proposed_courses:
+        if course not in available_courses:
+            return f"Course {course.id} is not available."
+    return "All proposed courses are valid."
+
+
+print(course_mapping("IT6047", total_course))
+
+
+def course_planning(request: CoursePlanRequest) -> CoursePlanResponse | str:
+    """Plan courses for the student based on their current state and proposed courses."""
+    # state = request.state if request.state else Student(
+    #     name=student.name,
+    #     student_id=student.student_id,
+    #     program=student.program,
+    #     learned=student.learned,
+    #     semester=student.semester
+    # )
+    # proposed_courses = request.proposed_courses if request.proposed_courses else proposed_courses
+    proposed_courses = [course_mapping(course_id, total_course)
+                        for course_id in request.proposed_courses]
+
+    available_courses = []
+    for course in total_course:
+        if course not in initial_state.student.learned:
+            # Kiểm tra prerequisite
+            prerequisites_met = all(
+                pre['ModulesCode'] in [c.id for c in initial_state.student.learned] for pre in course.prerequisite)
+            # Kiểm tra before
+            before_met = all(
+                bef['ModulesCode'] in [c.id for c in initial_state.student.learned] for bef in course.before)
+            if prerequisites_met and before_met and course.semester >= initial_state.student.semester:
+                available_courses.append(course)
+
+    print(
+        f"Planning courses for student {initial_state.student.name} with {len(initial_state.student.learned)} learned courses and {len(proposed_courses)} proposed courses.")
+    courses, total_credits = greedy_adding_algorithm(state=initial_state,
+                                                     proposed_courses=proposed_courses,
+                                                     available_courses=available_courses,
+                                                     max_credits=request.max_credits)
+    print(
+        f"New state has {len(courses)} courses with total credit {total_credits}.")
+    return CoursePlanResponse(planned_courses=courses, total_credits=total_credits)
+
+
+print(course_planning(CoursePlanRequest(
+    proposed_courses=["IT6120"], max_credits=15)))

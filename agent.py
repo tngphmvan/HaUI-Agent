@@ -1,19 +1,74 @@
 # from mcp.server.fastmcp import FastMCP
 from models import Course, Student, Semester, State, CoursePlanRequest, CoursePlanResponse
-from algo import greedy_adding_algorithm, initial_state as state, proposed_courses, available_courses, student
+from algo import greedy_adding_algorithm, initial_state, student, course_mapping, total_course
 import json
 import random
 from typing import List
 from mcp.server.fastmcp import FastMCP
+import logging
+import copy
 # import sys
 # import io
 # sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 mcp = FastMCP(name="mcp-server")
 
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
+
+
+# @mcp.tool()
+# def check_course_validity(course_ids: List[str]) -> str:
+#     """Check if the proposed courses are valid for the student."""
+#     proposed_courses = [course_mapping(course_id, total_course)
+#                         for course_id in course_ids]
+#     available_courses = [
+#         course for course in total_course if course not in initial_state.student.learned and course.before == [] and course.prerequisite == []]
+#     for course in proposed_courses:
+#         if course not in available_courses:
+#             return f"Course {course.id} is not available."
+#     return "All proposed courses are valid."
 
 @mcp.tool()
-def course_planning(request: CoursePlanRequest) -> CoursePlanResponse:
-    """Plan courses for the student based on their current state and proposed courses."""
+def check_course_validity(course_ids: List[str]) -> str:
+    """Check if the proposed courses are valid for the student."""
+    proposed_courses = []
+    invalid_courses = []
+    not_found_courses = []
+    for course_id in course_ids:
+        course = course_mapping(course_id, total_course)
+        if course is None:
+            not_found_courses.append(course_id)
+        proposed_courses.append(course)
+    if not_found_courses:
+        return f"Courses not found: {', '.join(not_found_courses)}"
+    for course in proposed_courses:
+        # Kiểm tra prerequisite
+        for pre in course.prerequisite:
+            if pre['ModulesCode'] not in [c.id for c in initial_state.student.learned]:
+                invalid_courses.append(
+                    f"Course {course.id} requires prerequisite {pre}.")
+        # Kiểm tra before
+        for bef in course.before:
+            if bef['ModulesCode'] not in [c.id for c in initial_state.student.learned]:
+                invalid_courses.append(
+                    f"Course {course.id} requires to complete {bef} before.")
+    if invalid_courses:
+        return '\n'.join(invalid_courses)
+
+    return "All proposed courses are valid."
+
+
+@mcp.tool()
+def course_planning(proposed_courses: list[str], max_credits: int) -> CoursePlanResponse | str:
+    """Plan courses for the student based on their current state and proposed courses.
+
+    Args:
+        proposed_courses (list[str]): List of proposed course IDs.
+        max_credits (int): Maximum credits allowed for the semester.
+
+    Returns:
+        CoursePlanResponse | str: Response containing planned courses and total credits or an error message.
+    """
     # state = request.state if request.state else Student(
     #     name=student.name,
     #     student_id=student.student_id,
@@ -22,11 +77,45 @@ def course_planning(request: CoursePlanRequest) -> CoursePlanResponse:
     #     semester=student.semester
     # )
     # proposed_courses = request.proposed_courses if request.proposed_courses else proposed_courses
-
-    print(
-        f"Planning courses for student {state.student.name} with {len(state.student.learned)} learned courses and {len(proposed_courses)} proposed courses.")
+    state = copy.deepcopy(initial_state)  # Luôn tạo state mới
+    proposed_courses_processed = [course_mapping(course_id, total_course)
+                                  for course_id in proposed_courses]
+    # logger.debug(f"Request received: {request}")
+    logger.debug(f"Total courses in the program: {len(total_course)}")
+    logger.debug(
+        f"Proposed courses: {[course.id for course in proposed_courses_processed]}")
+    max_credits = int(max_credits)
+    # logger.debug(f"Request received: {request}")
+    # logger.debug(f"State: {state}")
+    # logger.debug(f"Proposed courses: {proposed_courses}")
+    logger.debug(f"Max credits: {max_credits}")
+    available_courses = []
+    for course in total_course:
+        if course not in initial_state.student.learned:
+            # Kiểm tra prerequisite
+            # prerequisites_met = all(
+            #     pre['ModulesCode'] in [c.id for c in initial_state.student.learned] for pre in course.prerequisite)
+            # # Kiểm tra before
+            # before_met = all(
+            #     bef['ModulesCode'] in [c.id for c in initial_state.student.learned] for bef in course.before)
+            # if prerequisites_met and before_met and course.semester >= initial_state.student.semester:
+            #     available_courses.append(course)
+            for pre in course.prerequisite:
+                if pre['ModulesCode'] not in [c.id for c in initial_state.student.learned]:
+                    break
+            else:
+                for bef in course.before:
+                    if bef['ModulesCode'] not in [c.id for c in initial_state.student.learned]:
+                        break
+                else:
+                    if course.semester >= initial_state.student.semester:
+                        available_courses.append(course)
+    logger.debug(
+        f"Available courses: {[course.id for course in available_courses]}")
     courses, total_credits = greedy_adding_algorithm(
-        state, proposed_courses, available_courses=available_courses, max_credits=request.max_credits)
+        state, proposed_courses_processed, available_courses, max_credits)
+    print(
+        f"Planning courses for student {state.student.name} with {len(state.student.learned)} learned courses and {len(proposed_courses_processed)} proposed courses.")
     print(
         f"New state has {len(courses)} courses with total credit {total_credits}.")
     return CoursePlanResponse(planned_courses=courses, total_credits=total_credits)
@@ -85,7 +174,7 @@ def fetch_my_info() -> str:
 
 
 if __name__ == "__main__":
-    import logging
+
     logging.basicConfig(level=logging.DEBUG)
     print("Starting MCP server...")
     # mcp.run(transport="streamable-http")
