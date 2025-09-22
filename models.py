@@ -6,10 +6,13 @@ class Course(BaseModel):
     name: str
     id: str
     credit: int
-    prerequisite: List = Field(default_factory=list)
-    before: List = Field(default_factory=list)
-    semester: Optional[int] = None
-    optional_group: Optional[str] = ""
+    prerequisite: List = Field(
+        default_factory=list, description="Các khóa học tiên quyết, cần hoàn thành trước khi học khóa này")
+    before: List = Field(
+        default_factory=list, description="Các khóa học cần hoàn thành trước khi học khóa này")
+    semester: Optional[int] = Field(description="Học kỳ của khóa học")
+    optional_group: Optional[str] = Field(
+        description="Nhóm tự chọn của khóa học")
 
     def __hash__(self):
         return hash(self.id)
@@ -24,23 +27,47 @@ class Course(BaseModel):
 
 
 class Semester(BaseModel):
-    name: str
-    courses: List[Course] = Field(default_factory=list)
-    total_credit: int = 0
+    name: int = Field(description="Thứ tự của Học kỳ")
+    courses: List[Course] = Field(
+        default_factory=list, description="Danh sách các khóa học trong học kỳ")
+    total_credit: int = Field(0, description="Tổng tín chỉ của học kỳ")
 
 
 class Student(BaseModel):
-    name: str
-    student_id: str
-    program: str
-    learned: List[Course] = Field(default_factory=list)
-    semester: int = 2
+    name: str = Field(description="Tên sinh viên")
+    student_id: str = Field(description="Mã số sinh viên")
+    program: str = Field(
+        description="Chương trình đào tạo (ngành học, ví dụ: CNTT, Kinh tế, ...)")
+    learned: List[Course] = Field(
+        default_factory=list, description="Danh sách các môn đã hoàn thành")
+    semester: int = Field(description="Học kỳ hiện tại của sinh viên")
 
     def __str__(self):
         return f"{self.name} (ID: {self.student_id}, Program: {self.program}, Semester: {self.semester}, Learned Courses: {len(self.learned)})"
 
 
 class State(BaseModel):
-    student: Student
-    semester: Semester
-    total_credit: int
+    student: Student = Field(description="Thông tin sinh viên")
+    semester: Semester = Field(description="Thông tin học kỳ hiện tại")
+    total_credit: int = Field(
+        0, description="Tổng tín chỉ đã đăng ký trong học kỳ hiện tại")
+
+
+class CoursePlanRequest(BaseModel):
+    # proposed_courses: List[Course] = Field(
+    #     default_factory=list, description="Danh sách các khóa học đề xuất để lên kế hoạch")
+    max_credits: int = Field(
+        25, description="Tổng tín chỉ mà sinh viên muốn đăng ký", ge=11, le=27)
+    # student_info: Optional[Student] = Field(
+    #     None, description="Thông tin sinh viên, nếu không có sẽ dùng thông tin mặc định trong trạng thái")
+    # available_courses: Optional[List[Course]] = Field(
+    #     None, description="Danh sách các khóa học có sẵn, nếu không có sẽ dùng danh sách mặc định trong trạng thái")
+    # state: Optional[State] = Field(
+    #     None, description="Trạng thái hiện tại của sinh viên, nếu không có sẽ dùng trạng thái mặc định")
+
+
+class CoursePlanResponse(BaseModel):
+    planned_courses: List[Course] = Field(
+        default_factory=list, description="Danh sách các khóa học được lên kế hoạch")
+    total_credits: int = Field(
+        0, description="Tổng tín chỉ của các khóa học được lên kế hoạch")

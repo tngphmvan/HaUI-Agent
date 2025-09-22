@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from mcp.server.fastmcp import FastMCP
+from fastmcp import FastMCP, mcp_config
 
 mcp = FastMCP("BaseModelDemo")
 
@@ -26,4 +26,5 @@ def add_numbers(data: CalculatorInput) -> CalculatorOutput:
 
 
 if __name__ == "__main__":
+    print("Starting MCP server...")
     mcp.run("stdio")

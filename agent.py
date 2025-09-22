@@ -1,30 +1,35 @@
-from mcp.server.fastmcp import FastMCP
-from models import Course, Student, Semester, State
-from algo import greedy_adding_algorithm, initial_state as state, proposed_courses
+# from mcp.server.fastmcp import FastMCP
+from models import Course, Student, Semester, State, CoursePlanRequest, CoursePlanResponse
+from algo import greedy_adding_algorithm, initial_state as state, proposed_courses, available_courses, student
 import json
 import random
 from typing import List
-# from fastmcp import FastMCP
+from mcp.server.fastmcp import FastMCP
+# import sys
+# import io
+# sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 mcp = FastMCP(name="mcp-server")
-
-student = Student(
-    name="Nguyen Van A",
-    student_id="123456",
-    program="CNTT",
-    learned=[],
-    semester=2
-)
 
 
 @mcp.tool()
-def course_planning() -> List[Course]:
+def course_planning(request: CoursePlanRequest) -> CoursePlanResponse:
     """Plan courses for the student based on their current state and proposed courses."""
+    # state = request.state if request.state else Student(
+    #     name=student.name,
+    #     student_id=student.student_id,
+    #     program=student.program,
+    #     learned=student.learned,
+    #     semester=student.semester
+    # )
+    # proposed_courses = request.proposed_courses if request.proposed_courses else proposed_courses
+
     print(
         f"Planning courses for student {state.student.name} with {len(state.student.learned)} learned courses and {len(proposed_courses)} proposed courses.")
-    new_state = greedy_adding_algorithm(state, proposed_courses)
+    courses, total_credits = greedy_adding_algorithm(
+        state, proposed_courses, available_courses=available_courses, max_credits=request.max_credits)
     print(
-        f"New state has {len(new_state.semester.courses)} courses with total credit {new_state.semester.total_credit}.")
-    return [course for course in new_state.semester.courses]
+        f"New state has {len(courses)} courses with total credit {total_credits}.")
+    return CoursePlanResponse(planned_courses=courses, total_credits=total_credits)
 
 
 @mcp.tool()
@@ -84,4 +89,6 @@ if __name__ == "__main__":
     logging.basicConfig(level=logging.DEBUG)
     print("Starting MCP server...")
     # mcp.run(transport="streamable-http")
+    # config = mcp_config.MCPConfig()
+    # print(config.to_dict())
     mcp.run(transport="stdio")  # Use stdio transport for better compatibility
