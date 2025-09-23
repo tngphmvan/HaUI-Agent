@@ -90,28 +90,23 @@ def course_planning(proposed_courses: list[str], max_credits: int) -> CoursePlan
     # logger.debug(f"Proposed courses: {proposed_courses}")
     logger.debug(f"Max credits: {max_credits}")
     available_courses = []
+    logger.debug(
+        f"Student learned courses: {[course.id for course in initial_state.student.learned]}")
+    logger.debug(f"Total courses: {[course.id for course in total_course]}")
     for course in total_course:
         if course not in initial_state.student.learned:
             # Kiểm tra prerequisite
-            # prerequisites_met = all(
-            #     pre['ModulesCode'] in [c.id for c in initial_state.student.learned] for pre in course.prerequisite)
-            # # Kiểm tra before
-            # before_met = all(
-            #     bef['ModulesCode'] in [c.id for c in initial_state.student.learned] for bef in course.before)
-            # if prerequisites_met and before_met and course.semester >= initial_state.student.semester:
-            #     available_courses.append(course)
-            for pre in course.prerequisite:
-                if pre['ModulesCode'] not in [c.id for c in initial_state.student.learned]:
-                    break
-            else:
-                for bef in course.before:
-                    if bef['ModulesCode'] not in [c.id for c in initial_state.student.learned]:
-                        break
-                else:
-                    if course.semester >= initial_state.student.semester:
-                        available_courses.append(course)
+            prerequisites_met = all(
+                pre['ModulesCode'] in [c.id for c in initial_state.student.learned] for pre in course.prerequisite)
+            # Kiểm tra before
+            before_met = all(
+                bef['ModulesCode'] in [c.id for c in initial_state.student.learned] for bef in course.before)
+            if prerequisites_met and before_met and course.semester >= initial_state.student.semester:
+                available_courses.append(course)
     logger.debug(
         f"Available courses: {[course.id for course in available_courses]}")
+    logger.debug(
+        f"Available courses after filtering: {len(available_courses)}")
     courses, total_credits = greedy_adding_algorithm(
         state, proposed_courses_processed, available_courses, max_credits)
     print(

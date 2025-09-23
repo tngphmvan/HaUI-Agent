@@ -152,8 +152,8 @@ def greedy_adding_algorithm(
                 # logger.debug(
                 #     f"Skip proposed course {course.id}, would exceed max credits.")
 
-    # B2: Sau đó add các môn khả dụng (available)
-    for course in sorted(available_courses, key=lambda c: c.semester):
+    # B2: Sau đó add các môn khả dụng (available) theo thứ tự kỳ học và thứ tự tín chỉ tăng dần
+    for course in sorted(available_courses, key=lambda c: (c.semester, c.credit)):
         if "Tiếng Trung" in course.name or "Tiếng Hàn" in course.name or "Tiếng Nhật" in course.name:
             continue
         if course in state.student.learned or course in state.semester.courses:
@@ -162,8 +162,8 @@ def greedy_adding_algorithm(
             continue
         if state.semester.total_credit + course.credit > max_credits:
             break
-
         add_course(state, course)
+
         # logger.debug(
         #     f"Added available course: {course.id} ({course.credit} credits).")
 
@@ -373,6 +373,9 @@ def course_planning(request: CoursePlanRequest) -> CoursePlanResponse | str:
                 bef['ModulesCode'] in [c.id for c in initial_state.student.learned] for bef in course.before)
             if prerequisites_met and before_met and course.semester >= initial_state.student.semester:
                 available_courses.append(course)
+    print(
+        f"Available courses: {[course.id for course in available_courses]}")
+    print(f"Available courses after filtering: {len(available_courses)}")
 
     print(
         f"Planning courses for student {initial_state.student.name} with {len(initial_state.student.learned)} learned courses and {len(proposed_courses)} proposed courses.")
@@ -385,5 +388,5 @@ def course_planning(request: CoursePlanRequest) -> CoursePlanResponse | str:
     return CoursePlanResponse(planned_courses=courses, total_credits=total_credits)
 
 
-print(course_planning(CoursePlanRequest(
-    proposed_courses=["IT6120"], max_credits=15)))
+# print(course_planning(CoursePlanRequest(
+#     proposed_courses=["IT6120"], max_credits=27)))
