@@ -158,7 +158,8 @@ def greedy_adding_algorithm(
             continue
         if course in state.student.learned or course in state.semester.courses:
             continue
-        if course.optional_group and any(c.optional_group == course.optional_group for c in state.semester.courses):
+        if course.optional_group and (any(c.optional_group == course.optional_group for c in state.semester.courses) or
+                                      any(c.optional_group == course.optional_group for c in state.student.learned)):
             continue
         if state.semester.total_credit + course.credit > max_credits:
             break
@@ -168,6 +169,52 @@ def greedy_adding_algorithm(
         #     f"Added available course: {course.id} ({course.credit} credits).")
 
     return (state.semester.courses, state.semester.total_credit)
+
+
+def find_all_subsequences(proposed_courses: list[Course], available_courses: list[Course], max_credits: int):
+    """Find all subsequences of courses with total credits equal to k and return the lexicographically smallest one, sort by (semester, credit)."""
+
+    result = []  # Chứa các subsequence hợp lệ
+    proposed_credits = sum(course.credit for course in proposed_courses)
+    remaining_credits = max_credits - proposed_credits
+
+    # Nếu proposed_courses đã vượt quá max_credits
+    if remaining_credits < 0:
+        return None
+
+    # Nếu proposed_courses đúng bằng max_credits
+    if remaining_credits == 0:
+        return proposed_courses
+
+    n = len(available_courses)
+
+    def backtrack(index, current_sum, current_subsequence):
+        if current_sum == remaining_credits:
+            # Kết hợp proposed_courses + current_subsequence
+            full_sequence = proposed_courses + current_subsequence[:]
+            result.append(full_sequence)
+            return
+
+        if index >= n or current_sum > remaining_credits:
+            return
+
+        # Không lấy phần tử hiện tại
+        backtrack(index + 1, current_sum, current_subsequence)
+
+        # Lấy phần tử hiện tại
+        current_subsequence.append(available_courses[index])
+        backtrack(index + 1, current_sum +
+                  available_courses[index].credit, current_subsequence)
+        current_subsequence.pop()
+
+    backtrack(0, 0, [])
+
+    # Trả về dãy con có thứ tự từ điển nhỏ nhất
+    if not result:
+        return proposed_courses if proposed_credits <= max_credits else None
+
+    return (min(result, key=lambda subseq: [(course.semester, course.credit) for course in subseq]),
+            sum(course.credit for course in min(result, key=lambda subseq: [(course.semester, course.credit) for course in subseq])))
 
 
 def course_mapping(course_id: str, courses_list: list[Course]) -> Course:
@@ -187,6 +234,8 @@ semesters = [
     Semester(name=6),
     Semester(name=7),
     Semester(name=8)
+
+
 ]
 program_framework = json.load(
     open("khung_ctrinh_cntt_14_9_processed.json", 'r', encoding='utf-8'))
@@ -303,6 +352,10 @@ learned_courses.append(TcCNTT1[0])
 learned_courses.append(TcCNTT2[0])
 learned_courses.extend(sorted(TcNN4, key=lambda c: c.semester)[0:2])
 
+# learned_courses.remove(course_mapping("LP6010", total_course))
+# learned_courses.remove(course_mapping("IT6015", total_course))
+# learned_courses.remove(course_mapping("FL6086", total_course))
+
 # for course in learned_courses:
 #     print(f"Kỳ: {course.semester}, {course.name}, {course.credit}")
 
@@ -361,32 +414,48 @@ def course_planning(request: CoursePlanRequest) -> CoursePlanResponse | str:
     # proposed_courses = request.proposed_courses if request.proposed_courses else proposed_courses
     proposed_courses = [course_mapping(course_id, total_course)
                         for course_id in request.proposed_courses]
-
     available_courses = []
+    # if request.brute_force:
+    #     for course in total_course:
+    #         if course not in initial_state.student.learned:
+    #             prerequisites_met = all(
+    #                 pre['ModulesCode'] in [c.id for c in initial_state.student.learned] for pre in course.prerequisite)
+    #             if prerequisites_met:
+    #                 available_courses.append(course)
+    # else:
     for course in total_course:
         if course not in initial_state.student.learned:
             # Kiểm tra prerequisite
             prerequisites_met = all(
                 pre['ModulesCode'] in [c.id for c in initial_state.student.learned] for pre in course.prerequisite)
             # Kiểm tra before
-            before_met = all(
+            before_met = any(
                 bef['ModulesCode'] in [c.id for c in initial_state.student.learned] for bef in course.before)
-            if prerequisites_met and before_met and course.semester >= initial_state.student.semester:
+            if prerequisites_met and (not before_met and course.semester <= initial_state.student.semester):
                 available_courses.append(course)
-    print(
-        f"Available courses: {[course.id for course in available_courses]}")
+    # print(
+    #     f"Available courses: {[course.id for course in available_courses]}")
     print(f"Available courses after filtering: {len(available_courses)}")
 
     print(
         f"Planning courses for student {initial_state.student.name} with {len(initial_state.student.learned)} learned courses and {len(proposed_courses)} proposed courses.")
-    courses, total_credits = greedy_adding_algorithm(state=initial_state,
-                                                     proposed_courses=proposed_courses,
-                                                     available_courses=available_courses,
-                                                     max_credits=request.max_credits)
+    course, total_credits = None, 0
+    if not request.brute_force:
+        courses, total_credits = greedy_adding_algorithm(state=initial_state,
+                                                         proposed_courses=proposed_courses,
+                                                         available_courses=available_courses,
+                                                         max_credits=request.max_credits)
+    else:
+        courses, total_credits = find_all_subsequences(
+            proposed_courses, available_courses, request.max_credits)
     print(
         f"New state has {len(courses)} courses with total credit {total_credits}.")
     return CoursePlanResponse(planned_courses=courses, total_credits=total_credits)
 
 
-# print(course_planning(CoursePlanRequest(
-#     proposed_courses=["IT6120"], max_credits=27)))
+print(course_planning(CoursePlanRequest(
+    proposed_courses=["IT6120"], max_credits=27, brute_force=False)))
+
+# print(find_all_subsequences(proposed_courses, available_courses, 15))
+# print(find_all_subsequences(
+#     [course_mapping("IT6120", total_course)], available_courses, 27))

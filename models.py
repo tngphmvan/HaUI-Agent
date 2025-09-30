@@ -58,6 +58,8 @@ class CoursePlanRequest(BaseModel):
         default_factory=list, description="Danh sách mã các khóa học đề xuất để lên kế hoạch")
     max_credits: int = Field(
         25, description="Tổng tín chỉ mà sinh viên muốn đăng ký", ge=11, le=27)
+    brute_force: Optional[bool] = Field(
+        False, description="Nếu True, sử dụng phương pháp tìm kiếm tất cả các dãy con để chọn dãy có tổng tín chỉ lớn nhất mà không vượt quá max_credits. Nếu False, sử dụng thuật toán tham lam.")
     # student_info: Optional[Student] = Field(
     #     None, description="Thông tin sinh viên, nếu không có sẽ dùng thông tin mặc định trong trạng thái")
     # available_courses: Optional[List[Course]] = Field(

@@ -63,7 +63,7 @@ def course_planning(proposed_courses: list[str], max_credits: int) -> CoursePlan
     """Plan courses for the student based on their current state and proposed courses.
 
     Args:
-        proposed_courses (list[str]): List of proposed course IDs.
+        proposed_courses (list[str]): List of proposed course IDs, if user not specified, it will be empty list.
         max_credits (int): Maximum credits allowed for the semester.
 
     Returns:
@@ -101,7 +101,7 @@ def course_planning(proposed_courses: list[str], max_credits: int) -> CoursePlan
             # Kiểm tra before
             before_met = all(
                 bef['ModulesCode'] in [c.id for c in initial_state.student.learned] for bef in course.before)
-            if prerequisites_met and before_met and course.semester >= initial_state.student.semester:
+            if prerequisites_met and before_met:
                 available_courses.append(course)
     logger.debug(
         f"Available courses: {[course.id for course in available_courses]}")
