@@ -10,6 +10,13 @@ from pathlib import Path
 from typing import Optional
 from inittialize import learned_course, student_semester
 import logging
+import sys
+import io
+
+# Force UTF-8 encoding
+if sys.platform == "win32":
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
 
 # Create FastMCP server instance
 mcp = FastMCP("course-scheduler")
@@ -30,8 +37,8 @@ def fetch_student_info():
 
 @mcp.tool()
 def initialize_scheduler(
-    curriculum_file_path: str = r"E:\HaUI_Agent\khung ctrinh cntt.json",
-    processed_file_path: str = r"E:\HaUI_Agent\sample.json"
+    curriculum_file_path: str = r"D:\HaUI-Agent\khung ctrinh cntt.json",
+    processed_file_path: str = r"D:\HaUI-Agent\sample.json"
 ) -> str:
     """
     Initialize the course scheduler with curriculum data files.
@@ -171,7 +178,7 @@ def _apply_strict_credit_limit(
     Áp dụng strict credit limit - đảm bảo tổng tín chỉ đúng bằng target_credits
 
     Chiến lược:
-    1. Nếu total < target: Thêm môn học từ các kỳ tiếp theo (theo thứ tự ưu tiên)
+    1. Nếu total < target: Thêm môn học từ các kỳ tiếp theo (theo thứ tự ưu tiên), loại bỏ ngẫu nhiên 1 môn và thêm môn khác cho đến khi đạt đủ
     2. Nếu total > target: Loại bỏ môn học ít ưu tiên nhất (giữ lại catch-up và priority)
     3. Ưu tiên: CATCH-UP > PRIORITY > ON-TRACK > ADVANCED
 
@@ -185,6 +192,7 @@ def _apply_strict_credit_limit(
         dict: Kết quả đã điều chỉnh
     """
     from copy import deepcopy
+    import random
 
     adjusted_result = deepcopy(result)
     current_total = adjusted_result["total_credits"]
@@ -194,79 +202,137 @@ def _apply_strict_credit_limit(
     if current_total < target_credits:
         deficit = target_credits - current_total
         completed_set = set(completed_courses)
-        suggested_codes = {s.ma_hoc_phan for s in suggestions}
 
-        # Tìm các môn có thể thêm (chưa học, chưa gợi ý, đủ điều kiện)
-        candidate_courses = []
+        adjusted_result["warnings"].append(
+            f"⚠️ Chế độ nghiêm ngặt: Cần thêm {deficit} tín chỉ để đạt đúng {target_credits} tín chỉ."
+        )
 
-        for code, course in scheduler.course_map.items():
-            if (code not in completed_set and
-                code not in suggested_codes and
-                    scheduler._check_prerequisites(course, completed_set)):
+        # Thuật toán lặp: loại bỏ và thêm môn cho đến khi đạt target
+        max_iterations = 10  # Giới hạn số lần lặp để tránh vòng lặp vô hạn
+        iteration = 0
 
-                # Tính độ ưu tiên dựa trên kỳ
-                priority_score = 0
-                if course.hoc_ky < current_semester:
-                    priority_score = 1000 + \
-                        (current_semester - course.hoc_ky) * 100  # CATCH-UP
-                elif course.hoc_ky == current_semester:
-                    priority_score = 500  # ON-TRACK
-                else:
-                    # ADVANCED (ít ưu tiên)
-                    priority_score = 100 - \
-                        (course.hoc_ky - current_semester) * 10
+        while current_total < target_credits and iteration < max_iterations:
+            iteration += 1
+            remaining_deficit = target_credits - current_total
 
-                candidate_courses.append({
-                    "course": course,
-                    "priority": priority_score,
-                    "credits": course.so_tin_chi
-                })
+            print(
+                f"Iteration {iteration}: Need {remaining_deficit} more credits")
 
-        # Sắp xếp theo độ ưu tiên giảm dần
-        candidate_courses.sort(key=lambda x: x["priority"], reverse=True)
+            # Bước 1: Tìm tất cả môn có thể thêm (theo thứ tự khung chương trình)
+            suggested_codes = {s.ma_hoc_phan for s in suggestions}
+            candidate_courses = []
 
-        # Thêm môn để đạt đúng target_credits
-        added_credits = 0
-        for candidate in candidate_courses:
-            if added_credits + candidate["credits"] <= deficit:
-                course = candidate["course"]
+            for code, course in scheduler.course_map.items():
+                if (code not in completed_set and
+                    code not in suggested_codes and
+                        scheduler._check_prerequisites(course, completed_set)):
 
-                # Xác định strategy
-                if course.hoc_ky < current_semester:
-                    strategy = StrategyType.CATCH_UP
-                    reason = f"CATCH-UP (Strict Mode): Môn học kỳ {course.hoc_ky} - Bạn đang kỳ {current_semester}"
-                elif course.hoc_ky == current_semester:
-                    strategy = StrategyType.ON_TRACK
-                    reason = f"ON-TRACK (Strict Mode): Môn học đúng kỳ {current_semester}"
-                else:
-                    strategy = StrategyType.ADVANCED
-                    reason = f"ADVANCED (Strict Mode): Môn học kỳ {course.hoc_ky} - Học sớm hơn kế hoạch"
+                    # Tính độ ưu tiên theo khung chương trình (semester trước → sau)
+                    priority_score = 0
+                    if course.hoc_ky < current_semester:
+                        priority_score = 1000 + \
+                            (current_semester - course.hoc_ky) * 100  # CATCH-UP
+                    elif course.hoc_ky == current_semester:
+                        priority_score = 500  # ON-TRACK
+                    else:
+                        priority_score = 100 - \
+                            (course.hoc_ky - current_semester) * 10  # ADVANCED
 
-                suggestion = CourseSuggestion(
-                    ma_hoc_phan=course.ma_hoc_phan,
-                    ten_hoc_phan=course.ten_hoc_phan,
-                    so_tin_chi=course.so_tin_chi,
-                    reason=reason,
-                    strategy=strategy,
-                    warnings=[
-                        "Thêm tự động để đạt đúng số tín chỉ mục tiêu"] if strategy == StrategyType.ADVANCED else [],
-                    is_auto_included=True
-                )
+                    candidate_courses.append({
+                        "course": course,
+                        "priority": priority_score,
+                        "credits": course.so_tin_chi
+                    })
 
-                suggestions.append(suggestion)
-                added_credits += candidate["credits"]
+            # Sắp xếp theo khung chương trình (semester tăng dần, rồi priority giảm dần)
+            candidate_courses.sort(key=lambda x: (
+                x["course"].hoc_ky, -x["priority"]))
 
-                if added_credits == deficit:
+            # Bước 2: Thử thêm môn đầu tiên có thể thêm
+            added_any = False
+            for candidate in candidate_courses:
+                if current_total + candidate["credits"] <= target_credits:
+                    # Thêm môn này
+                    course = candidate["course"]
+
+                    # Xác định strategy
+                    if course.hoc_ky < current_semester:
+                        strategy = StrategyType.CATCH_UP
+                        reason = f"CATCH-UP (Strict Mode): Môn học kỳ {course.hoc_ky} - Bạn đang kỳ {current_semester}"
+                    elif course.hoc_ky == current_semester:
+                        strategy = StrategyType.ON_TRACK
+                        reason = f"ON-TRACK (Strict Mode): Môn học đúng kỳ {current_semester}"
+                    else:
+                        strategy = StrategyType.ADVANCED
+                        reason = f"ADVANCED (Strict Mode): Môn học kỳ {course.hoc_ky} - Học sớm hơn kế hoạch"
+
+                    suggestion = CourseSuggestion(
+                        ma_hoc_phan=course.ma_hoc_phan,
+                        ten_hoc_phan=course.ten_hoc_phan,
+                        so_tin_chi=course.so_tin_chi,
+                        reason=reason,
+                        strategy=strategy,
+                        warnings=[
+                            "Thêm tự động để đạt đúng số tín chỉ mục tiêu"] if strategy == StrategyType.ADVANCED else [],
+                        is_auto_included=True
+                    )
+
+                    suggestions.append(suggestion)
+                    current_total += candidate["credits"]
+                    added_any = True
+                    print(
+                        f"Added: {course.ma_hoc_phan} ({candidate['credits']} credits)")
                     break
 
-        adjusted_result["total_credits"] = current_total + added_credits
+            # Bước 3: Nếu không thể thêm môn nào, loại bỏ 1 môn ít quan trọng
+            if not added_any and suggestions:
+                # Tìm môn ít quan trọng nhất để loại bỏ (không phải CATCH-UP hoặc PRIORITY)
+                removable_courses = []
 
-        if added_credits < deficit:
+                for sugg in suggestions:
+                    if sugg.strategy in [StrategyType.ON_TRACK, StrategyType.ADVANCED]:
+                        # Ưu tiên loại bỏ: ADVANCED > ON-TRACK
+                        priority_score = 10 if sugg.strategy == StrategyType.ADVANCED else 50
+                        removable_courses.append({
+                            "suggestion": sugg,
+                            "priority": priority_score,
+                            "credits": sugg.so_tin_chi
+                        })
+
+                if removable_courses:
+                    # Loại bỏ 1 môn ít quan trọng nhất
+                    # Ưu tiên thấp + tín chỉ cao
+                    removable_courses.sort(key=lambda x: (
+                        x["priority"], -x["credits"]))
+                    to_remove = removable_courses[0]["suggestion"]
+
+                    suggestions.remove(to_remove)
+                    current_total -= to_remove.so_tin_chi
+                    print(
+                        f"Removed: {to_remove.ma_hoc_phan} ({to_remove.so_tin_chi} credits)")
+
+                    adjusted_result["warnings"].append(
+                        f"🔄 Iteration {iteration}: Đã loại bỏ {to_remove.ten_hoc_phan} để tạo chỗ cho môn phù hợp hơn"
+                    )
+                else:
+                    # Không thể loại bỏ môn nào (chỉ còn CATCH-UP/PRIORITY)
+                    print("Cannot remove any courses (only CATCH-UP/PRIORITY left)")
+                    break
+
+            # Kiểm tra xem có đạt target chưa
+            if current_total == target_credits:
+                print(f"Target achieved: {current_total} credits")
+                break
+
+        # Cập nhật kết quả
+        adjusted_result["total_credits"] = current_total
+        adjusted_result["suggestions"] = suggestions
+
+        if current_total < target_credits:
             adjusted_result["warnings"].append(
-                f"⚠️ Chỉ có thể thêm {added_credits}/{deficit} tín chỉ. "
-                f"Không đủ môn học phù hợp để đạt đúng {target_credits} tín chỉ."
+                f"Sau {iteration} lần thử: Chỉ đạt {current_total}/{target_credits} tín chỉ. "
+                f"Không thể tối ưu thêm với các ràng buộc hiện tại."
             )
-
     # Trường hợp 2: Cần giảm tín chỉ
     elif current_total > target_credits:
         excess = current_total - target_credits
@@ -322,9 +388,10 @@ def _apply_strict_credit_limit(
     adjusted_result["suggestions"] = suggestions
 
     # Thêm thông báo về strict mode
+    # Cập nhật thông báo về strict mode
     if adjusted_result["total_credits"] == target_credits:
         adjusted_result["warnings"].insert(0,
-                                           f"✅ STRICT MODE: Đã đạt đúng {target_credits} tín chỉ theo yêu cầu"
+                                           f"✅ STRICT MODE: Đã đạt đúng {target_credits} tín chỉ sau {iteration} lần điều chỉnh"
                                            )
     else:
         adjusted_result["warnings"].insert(0,

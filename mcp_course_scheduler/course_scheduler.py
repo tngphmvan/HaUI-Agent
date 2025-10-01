@@ -89,10 +89,10 @@ class CourseScheduler:
         for khoi in khung_chuong_trinh:
             for hoc_phan_kien_thuc in khoi.get('hoc_phan_kien_thuc', []):
                 # Process mandatory courses
-                
+
                 for course in hoc_phan_kien_thuc.get('kien_thuc_bat_buoc', []):
                     self._add_course_to_map(course, is_mandatory=True)
-                
+
                 # Process elective courses
                 for tu_chon_group in hoc_phan_kien_thuc.get('kien_thuc_tu_chon', []):
 
@@ -205,7 +205,8 @@ class CourseScheduler:
 
     def _check_elective_limit(self, course: CourseDetail,
                               completed_courses: Set[str],
-                              current_suggestions: List[CourseSuggestion]) -> bool:
+                              current_suggestions: List[CourseSuggestion],
+                              is_priority: bool = False) -> bool:
         """
         Check if elective credit limit is satisfied (BR-003)
 
@@ -213,14 +214,18 @@ class CourseScheduler:
             course: Elective course to check
             completed_courses: Set of completed course codes
             current_suggestions: Currently suggested courses
+            is_priority: Whether this is a priority course (can override limit)
 
         Returns:
-            True if adding this course won't exceed elective group limit
+            True if adding this course is allowed
         """
         if course.is_mandatory or not course.elective_group:
             return True
 
-        # Calculate completed credits in this elective group
+        if not course.group_min_credits:
+            return True  # No limit
+
+        # Calculate completed + suggested credits in this elective group
         completed_credits = sum(
             self.course_map[code].so_tin_chi
             for code in completed_courses
@@ -228,7 +233,6 @@ class CourseScheduler:
             and self.course_map[code].elective_group == course.elective_group
         )
 
-        # Calculate suggested credits in this elective group
         suggested_credits = sum(
             sugg.so_tin_chi
             for sugg in current_suggestions
@@ -236,9 +240,17 @@ class CourseScheduler:
             and self.course_map[sugg.ma_hoc_phan].elective_group == course.elective_group
         )
 
-        total_credits = completed_credits + suggested_credits + course.so_tin_chi
+        total_credits = completed_credits + suggested_credits
 
-        return total_credits <= (course.group_min_credits or float('inf'))
+        # ✅ If already met minimum requirement and not priority, don't add more
+        if total_credits >= course.group_min_credits and not is_priority:
+            return False
+
+        # ✅ Check if adding this course would exceed reasonable limit
+        total_with_new = total_credits + course.so_tin_chi
+        reasonable_limit = course.group_min_credits * 1.5  # Allow 50% over minimum
+
+        return total_with_new <= reasonable_limit
 
     def _get_corequisites(self, course: CourseDetail,
                           completed_courses: Set[str]) -> List[str]:
@@ -339,7 +351,7 @@ class CourseScheduler:
             return None
 
         # BR-003: Check elective limits
-        if not self._check_elective_limit(course, completed_courses, current_suggestions):
+        if not self._check_elective_limit(course, completed_courses, current_suggestions, is_priority):
             return None
 
         # Check co-requisites
