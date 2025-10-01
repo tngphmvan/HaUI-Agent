@@ -415,24 +415,24 @@ def course_planning(request: CoursePlanRequest) -> CoursePlanResponse | str:
     proposed_courses = [course_mapping(course_id, total_course)
                         for course_id in request.proposed_courses]
     available_courses = []
-    # if request.brute_force:
-    #     for course in total_course:
-    #         if course not in initial_state.student.learned:
-    #             prerequisites_met = all(
-    #                 pre['ModulesCode'] in [c.id for c in initial_state.student.learned] for pre in course.prerequisite)
-    #             if prerequisites_met:
-    #                 available_courses.append(course)
-    # else:
-    for course in total_course:
-        if course not in initial_state.student.learned:
-            # Kiểm tra prerequisite
-            prerequisites_met = all(
-                pre['ModulesCode'] in [c.id for c in initial_state.student.learned] for pre in course.prerequisite)
-            # Kiểm tra before
-            before_met = any(
-                bef['ModulesCode'] in [c.id for c in initial_state.student.learned] for bef in course.before)
-            if prerequisites_met and (not before_met and course.semester <= initial_state.student.semester):
-                available_courses.append(course)
+    if request.brute_force:
+        for course in total_course:
+            if course not in initial_state.student.learned:
+                prerequisites_met = all(
+                    pre['ModulesCode'] in [c.id for c in initial_state.student.learned] for pre in course.prerequisite)
+                if prerequisites_met:
+                    available_courses.append(course)
+    else:
+        for course in total_course:
+            if course not in initial_state.student.learned:
+                # Kiểm tra prerequisite
+                prerequisites_met = all(
+                    pre['ModulesCode'] in [c.id for c in initial_state.student.learned] for pre in course.prerequisite)
+                # Kiểm tra before
+                before_met = any(
+                    bef['ModulesCode'] in [c.id for c in initial_state.student.learned] for bef in course.before)
+                if prerequisites_met and (not before_met and course.semester <= initial_state.student.semester):
+                    available_courses.append(course)
     # print(
     #     f"Available courses: {[course.id for course in available_courses]}")
     print(f"Available courses after filtering: {len(available_courses)}")
@@ -454,8 +454,8 @@ def course_planning(request: CoursePlanRequest) -> CoursePlanResponse | str:
 
 
 print(course_planning(CoursePlanRequest(
-    proposed_courses=["IT6120"], max_credits=27, brute_force=False)))
+    proposed_courses=["IT6120"], max_credits=27, brute_force=True)))
 
 # print(find_all_subsequences(proposed_courses, available_courses, 15))
 # print(find_all_subsequences(
-#     [course_mapping("IT6120", total_course)], available_courses, 27))
+#     [course_mapping("IT6120", total_course)], available_courses, 28))

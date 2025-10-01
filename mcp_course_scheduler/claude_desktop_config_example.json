@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "course-scheduler": {
+      "command": "python",
+      "args": [
+        "-u",
+        "e:\\HaUI_Agent\\mcp_course_scheduler\\server.py"
+      ],
+      "env": {
+        "PYTHONPATH": "e:\\HaUI_Agent"
+      }
+    }
+  }
+}
