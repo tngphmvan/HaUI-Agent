@@ -5,4 +5,4 @@ learned_course = [
     'LP6011', 'FL6085', 'FL6086', 'BS6021'
 ]
 
-student_semester = 3
+student_semester = 2
