@@ -4,11 +4,12 @@ Compatible with 'mcp dev' command
 """
 
 from mcp.server.fastmcp import FastMCP
+import requests
 from course_scheduler import CourseScheduler, CourseSuggestion, StrategyType
 import json
 from pathlib import Path
 from typing import Optional
-from inittialize import learned_course, student_semester
+from inittialize import learned_course, student_semester, course_number
 import logging
 import sys
 import io
@@ -25,6 +26,10 @@ mcp = FastMCP("course-scheduler")
 scheduler: Optional[CourseScheduler] = None
 curriculum_file: Optional[str] = None
 processed_file: Optional[str] = None
+
+url = "http://172.16.21.110:5280/api/v1/for-a-luong/full-option"
+
+headers = {"accept": "text/plain"}
 
 
 @mcp.tool()
@@ -69,7 +74,6 @@ def fetch_subjects_name():
 
 @mcp.tool()
 def initialize_scheduler(
-    curriculum_file_path: str = r"D:\HaUI-Agent\khung ctrinh cntt.json",
     processed_file_path: str = r"D:\HaUI-Agent\sample.json"
 ) -> str:
     """
@@ -77,37 +81,43 @@ def initialize_scheduler(
     Must be called before using other tools.
 
     Args:
-        curriculum_file_path: Absolute path to curriculum JSON file
         processed_file_path: Absolute path to processed curriculum JSON file
 
     Returns:
         JSON string with initialization result
     """
-    global scheduler, curriculum_file, processed_file
-
+    global scheduler, processed_file
+    params = {"maNganh": course_number}
     try:
         # Verify files exist
-        if not Path(curriculum_file_path).exists():
-            return json.dumps({
-                "error": f"Curriculum file not found: {curriculum_file_path}",
-                "success": False
-            }, indent=2)
-
         if not Path(processed_file_path).exists():
             return json.dumps({
                 "error": f"Processed file not found: {processed_file_path}",
                 "success": False
             }, indent=2)
 
-        curriculum_file = curriculum_file_path
+        response = requests.get(url, headers=headers, params=params)
+        if response.status_code != 200:
+            return json.dumps({
+                "error": f"Failed to fetch processed file from API. Status code: {response.status_code}",
+                "success": False
+            }, indent=2)
+        if not response.json().get('data'):
+            return json.dumps({
+                "error": f"Processed file data is empty or invalid from API.",
+                "success": False
+            }, indent=2)
+
+        processed_course = response.json()
         processed_file = processed_file_path
-        scheduler = CourseScheduler(curriculum_file, processed_file)
+        scheduler = CourseScheduler(
+            course_data=processed_course, processed_file=processed_file)
 
         result = {
             "success": True,
             "message": "Course scheduler initialized successfully",
-            "curriculum_file": curriculum_file,
             "processed_file": processed_file,
+            "course_id": course_number,
             "total_courses": len(scheduler.course_map)
         }
 
@@ -127,18 +137,18 @@ def suggest_courses(
     max_credits: int = 20,
     priority_courses: list[str] = [],
     non_priority_courses: list[str] = [],
-    strict_credit_limit: bool = False  # ✅ NEW: Đảm bảo nghiêm khắc số tín chỉ
+    strict_credit_limit: bool = True  # ✅ NEW: Đảm bảo nghiêm khắc số tín chỉ
 ) -> str:
     """
-    Generate optimized course enrollment suggestions.
+    Generate optimized course enrollment suggestions, ensuring total credits are within specified limits.
 
     Args:
         completed_courses: List of completed course codes (e.g., ['IT6015', 'BS6002'])
         current_semester: Current semester number (1-8)
-        max_credits: Maximum number of credits to enroll (default: 20)
+        max_credits: Maximum number of credits to enroll (default: 20) ## must be between 11 and 27
         priority_courses: Course names/codes the student WANTS to take (optional)
         non_priority_courses: Course names/codes the student DOES NOT want to take (optional)
-        strict_credit_limit: If True, ensures total credits equals max_credits exactly (default: False)
+        strict_credit_limit: If True, ensures total credits equals max_credits exactly (default: Tre)
                             If False, allows total credits <= max_credits
 
     Returns:
@@ -159,7 +169,7 @@ def suggest_courses(
             current_semester=current_semester
         )
 
-        # ✅ NEW: Áp dụng strict credit limit nếu được yêu cầu
+        # Luôn áp dụng strict credit limit nếu được yêu cầu
         if strict_credit_limit:
             result = _apply_strict_credit_limit(
                 result,
@@ -170,6 +180,17 @@ def suggest_courses(
 
         # Convert suggestions to serializable format
         suggestions_data = []
+        # Ensure within valid credit range
+        if not (11 <= result["total_credits"] <= 27):
+            result = _apply_strict_credit_limit(
+                result,
+                max_credits,
+                completed_courses,
+                current_semester
+            )
+            if not (11 <= result["total_credits"] <= 27):
+                raise Exception(
+                    f"Invalid total credits in suggestions: {result['total_credits']}. Must be between 11 and 27.")
         for sugg in result["suggestions"]:
             suggestions_data.append({
                 "course_code": sugg.ma_hoc_phan,
@@ -720,8 +741,8 @@ if __name__ == "__main__":
     # mcp.run(transport="streamable-http")
     # config = mcp_config.MCPConfig()
     # print(config.to_dict())
-    initialize_scheduler(
-        curriculum_file_path=r"E:\HaUI_Agent\khung ctrinh cntt.json",
-        processed_file_path=r"E:\HaUI_Agent\sample.json"
-    )
+    # initialize_scheduler(
+    #     curriculum_file_path=r"E:\HaUI_Agent\khung ctrinh cntt.json",
+    #     processed_file_path=r"E:\HaUI_Agent\sample.json"
+    # )
     mcp.run(transport="stdio")  # Use stdio transport for better compatibility

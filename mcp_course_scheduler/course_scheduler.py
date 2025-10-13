@@ -57,15 +57,15 @@ class CourseScheduler:
     Main class implementing the optimized course scheduling algorithm
     """
 
-    def __init__(self, curriculum_file: str, processed_file: str):
+    def __init__(self, course_data: dict, processed_file: str):
         """
         Initialize the scheduler with curriculum data
 
         Args:
-            curriculum_file: Path to 'khung ctrinh cntt.json'
+            course_data: Course data for fetching curriculum
             processed_file: Path to 'sample.json'
         """
-        self.curriculum_data = self._load_json(curriculum_file)
+        self.curriculum_data = course_data
         self.processed_data = self._load_json(processed_file)
         self.course_map: Dict[str, CourseDetail] = {}
         self.name_to_code_map: Dict[str, str] = {}
@@ -97,7 +97,12 @@ class CourseScheduler:
                 for tu_chon_group in hoc_phan_kien_thuc.get('kien_thuc_tu_chon', []):
 
                     group_name = tu_chon_group.get('ten_nhom_tu_chon', '')
-                    if group_name in ['TcNN1', 'TcNN2', 'TcNN3', 'Tc Ôn tập NN', 'TcGDTC']:
+
+                    if ('TcNN' in group_name and tu_chon_group['danh_sach_mon_tu_chon'][0]['ten_hoc_phan'].find('Nhật') != -1) or \
+                       ('TcNN' in group_name and tu_chon_group['danh_sach_mon_tu_chon'][0]['ten_hoc_phan'].find('Hàn') != -1) or \
+                       ('TcNN' in group_name and tu_chon_group['danh_sach_mon_tu_chon'][0]['ten_hoc_phan'].find('Trung') != -1) or \
+                       'Tc Ôn tập NN' in group_name or \
+                       'TcGDTC' in group_name:
                         continue  # Skip language and physical education electives
                     group_min_credits = float(
                         tu_chon_group.get('tin_chi_toi_thieu', 0))
