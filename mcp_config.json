@@ -1,0 +1,22 @@
+{
+  "mcpServers": {
+    "course-detail-server": {
+      "command": "python",
+      "args": [
+        "d:\\HaUI-Agent\\mcp_course_detail\\server.py"
+      ],
+      "env": {
+        "PYTHONIOENCODING": "utf-8"
+      }
+    },
+    "course-scheduler-server": {
+      "command": "python",
+      "args": [
+        "d:\\HaUI-Agent\\mcp_course_scheduler\\server_fastmcp.py"
+      ],
+      "env": {
+        "PYTHONIOENCODING": "utf-8"
+      }
+    }
+  }
+}

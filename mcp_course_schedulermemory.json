@@ -1,0 +1,2 @@
+{"type":"entity","name":"Plan_Semester3_Student","entityType":"semester_plan","observations":["semester: 3","courses: [FL6162, LP6012, LP6004, BS6012, BM6046, BM6035, BM6037_TA]","total_credits: 20"]}
+{"type":"entity","name":"ExamPrep_LP6004_Student","entityType":"assessment_preparation","observations":["course: LP6004","course_name: Tư tưởng Hồ Chí Minh","start_date: [auto]","status: planning","goal: maximize score","estimated_prep_hours: 20"]}
