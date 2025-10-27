@@ -273,7 +273,24 @@ def _apply_strict_credit_limit(
             suggested_codes = {s.ma_hoc_phan for s in suggestions}
             candidate_courses = []
 
+            # Tính tổng tín chỉ đã học cho mỗi nhóm tự chọn
+            elective_credits = {}
+            for code in completed_set:
+                if code in scheduler.course_map:
+                    course = scheduler.course_map[code]
+                    if course.elective_group and course.group_min_credits:
+                        if course.elective_group not in elective_credits:
+                            elective_credits[course.elective_group] = 0
+                        elective_credits[course.elective_group] += course.so_tin_chi
+
             for code, course in scheduler.course_map.items():
+                # Kiểm tra xem môn này có thuộc nhóm tự chọn đã đủ tín chỉ không
+                if course.elective_group and course.group_min_credits:
+                    current_credits = elective_credits.get(
+                        course.elective_group, 0)
+                    if current_credits >= course.group_min_credits:
+                        continue  # Bỏ qua môn này vì nhóm tự chọn đã đủ tín chỉ
+
                 if (code not in completed_set and
                     code not in suggested_codes and
                         scheduler._check_prerequisites(course, completed_set)):

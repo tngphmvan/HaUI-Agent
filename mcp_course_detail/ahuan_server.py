@@ -2,7 +2,7 @@ import sys
 from mcp.server.fastmcp import FastMCP
 import io
 
-mcp = FastMCP("ahuan_server")
+mcp = FastMCP("get_course_details")
 # Force UTF-8 encoding
 if sys.platform == "win32":
     sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
@@ -29,7 +29,9 @@ def get_course_details(content: str, query: str) -> str:
         "user_id": "1",
         "session_id": "1",
         "messages": [{"role": "user", "content": content}],
-        "query": query
+        "query": query,
+        "conversation_history": [
+        ]
     }
 
     try:

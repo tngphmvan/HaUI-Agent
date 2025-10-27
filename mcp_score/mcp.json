@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "score-agent-tool": {
+      "command": "python",
+      "args": [
+        "-u",
+        "d:\\HaUI_Agent\\mcp_score\\aminh_server.py"
+      ],
+      "env": {
+        "PYTHONPATH": "d:\\HaUI_Agent"
+      }
+    }
+  }
+}
