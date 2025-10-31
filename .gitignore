@@ -1,6 +1,6 @@
-"database_and_logs/" 
-"*.db"   
-"*.db-wal" 
-"*.db-shm" 
-"*.svg"
-"*.png"
+database_and_logs/ 
+*.db   
+*.db-wal 
+*.db-shm 
+*.svg
+*.png
